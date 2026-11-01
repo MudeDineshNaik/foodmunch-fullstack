@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Order delicious food from FoodMunch. Explore fresh meals, favourites and desserts.">
+    <title>FoodMunch | Good food, good mood</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <header class="site-header">
+        <nav class="navbar container" aria-label="Main navigation">
+            <a class="brand" href="#home" aria-label="FoodMunch home">
+                <span class="brand-icon">FM</span>
+                <span>Food<span class="brand-highlight">Munch</span></span>
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Open navigation" aria-expanded="false">☰</button>
+            
+<div class="nav-links" id="navLinks">
+    <a href="#home">Home</a>
+    <a href="#menu">Explore Menu</a>
+    <a href="#why-us">Why Us</a>
+
+    <button type="button" class="auth-nav-button" id="loginButton">
+        Login
+    </button>
+
+    <button type="button" class="auth-nav-button" id="signupButton">
+        Sign Up
+    </button>
+
+    <span id="userGreeting" hidden></span>
+
+    <button type="button" class="auth-nav-button" id="myOrdersButton" hidden>My Orders</button>
+
+<button type="button" class="auth-nav-button" id="adminDashboardButton" hidden>
+    Admin Dashboard
+</button>
+
+    <button type="button" class="auth-nav-button" id="logoutButton" hidden>
+        Logout
+    </button>
+
+    <button class="cart-nav-button" id="openCartButton">
+        Cart <span id="cartCount">0</span>
+    </button>
+</div>
+
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero" id="home">
+            <div class="hero-shade"></div>
+            <div class="container hero-content">
+                <p class="eyebrow">FRESHLY MADE · HAPPILY DELIVERED</p>
+                <h1>Good food.<br><span>Great mood.</span></h1>
+                <p class="hero-description">Your cravings called. We have something delicious for you.</p>
+                <div class="hero-actions">
+                    <a class="button button-primary" href="#menu">Explore menu <span aria-hidden="true">→</span></a>
+                    <a class="button button-light" href="#why-us">Why FoodMunch?</a>
+                </div>
+                <div class="hero-note"><span class="status-dot"></span> Made with care, served with joy</div>
+            </div>
+        </section>
+
+        <section class="section why-section" id="why-us">
+            <div class="container">
+                <div class="section-heading">
+                    <p class="eyebrow">THE FOODMUNCH PROMISE</p>
+                    <h2>Why choose us?</h2>
+                    <p>Little things that make every meal better.</p>
+                </div>
+                <div class="benefit-grid">
+                    <article class="benefit-card"><span class="benefit-icon">🥬</span><h3>Fresh ingredients</h3><p>Colourful, carefully selected ingredients in every bite.</p></article>
+                    <article class="benefit-card"><span class="benefit-icon">👨‍🍳</span><h3>Made with care</h3><p>Comfort-food favourites prepared to make your day.</p></article>
+                    <article class="benefit-card"><span class="benefit-icon">🛵</span><h3>Easy ordering</h3><p>Choose your favourites, add them to your cart, and place a demo order.</p></article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section menu-section" id="menu">
+            <div class="container">
+                <div class="menu-top">
+                    <div class="section-heading section-heading-left">
+                        <p class="eyebrow">MADE FOR YOUR CRAVINGS</p>
+                        <h2>Explore our menu</h2>
+                        <p>Find your next favourite dish.</p>
+                    </div>
+                    <label class="search-box"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Search food..." aria-label="Search food"></label>
+                </div>
+                <div class="category-list" id="categoryList" aria-label="Filter menu by category">
+                    <button class="category-button active" data-category="All">All food</button>
+                    <button class="category-button" data-category="Starters">Starters</button>
+                    <button class="category-button" data-category="Main Course">Main course</button>
+                    <button class="category-button" data-category="Healthy">Healthy</button>
+                    <button class="category-button" data-category="Desserts">Desserts</button>
+                    <button class="category-button" data-category="Drinks">Drinks</button>
+                </div>
+                <p class="menu-status" id="menuStatus" aria-live="polite">Loading menu...</p>
+                <div class="food-grid" id="foodGrid"></div>
+            </div>
+        </section>
+
+        <section class="closing-section">
+            <div class="container closing-inner">
+                <div><p class="eyebrow">YOUR NEXT HAPPY BITE</p><h2>Cravings don't wait.<br>Neither should you.</h2></div>
+                <a class="button button-dark" href="#menu">Find something tasty →</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container footer-inner">
+            <a class="brand footer-brand" href="#home"><span class="brand-icon">FM</span><span>Food<span class="brand-highlight">Munch</span></span></a>
+            <p>Made for learning. Built with a love for food.</p>
+            <p class="footer-small">Portfolio demo · No real payments are collected</p>
+        </div>
+    </footer>
+
+    <div class="cart-overlay" id="cartOverlay" hidden>
+        <button class="overlay-backdrop" id="closeCartBackdrop" aria-label="Close cart"></button>
+        <aside class="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cartTitle">
+            <div class="cart-header"><div><p class="eyebrow">YOUR SELECTION</p><h2 id="cartTitle">Your cart</h2></div><button class="icon-button" id="closeCartButton" aria-label="Close cart">✕</button></div>
+            <div class="cart-items" id="cartItems"></div>
+            <div class="cart-footer">
+                <div class="cart-total"><span>Total</span><strong id="cartTotal">₹0</strong></div>
+                <button class="button button-primary button-full" id="checkoutButton">Continue to checkout</button>
+                <p class="tiny-note">Demo checkout only. No payment is taken.</p>
+            </div>
+        </aside>
+    </div>
+
+    <div class="checkout-overlay" id="checkoutOverlay" hidden>
+        <div class="checkout-backdrop" id="closeCheckoutBackdrop"></div>
+        <section class="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
+            <div class="cart-header"><div><p class="eyebrow">ALMOST THERE</p><h2 id="checkoutTitle">Checkout</h2></div><button class="icon-button" id="closeCheckoutButton" aria-label="Close checkout">✕</button></div>
+            <p class="checkout-intro">Enter your details to place a sample order.</p>
+            <form id="checkoutForm">
+                <label class="form-field">Full name<input name="customerName" required minlength="2" autocomplete="name" placeholder="Your name"></label>
+                <label class="form-field">Email address<input name="email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+                <label class="form-field">Phone number<input name="phone" type="tel" required minlength="8" maxlength="15" autocomplete="tel" placeholder="Your phone number"></label>
+                <label class="form-field">Delivery address<textarea name="address" required minlength="8" rows="3" autocomplete="street-address" placeholder="House number, street, city"></textarea></label>
+                <div class="checkout-total">Order total <strong id="checkoutTotal">₹0</strong></div>
+                <p class="form-message" id="formMessage" role="status"></p>
+                <button class="button button-primary button-full" id="placeOrderButton" type="submit">Place demo order</button>
+            </form>
+        </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+
+<!-- Login and Signup Forms -->
+<div class="auth-overlay" id="authOverlay" hidden>
+    <section class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+
+        <button type="button" class="icon-button auth-close" id="closeAuthButton" aria-label="Close">
+            ✕
+        </button>
+
+        <p class="eyebrow">WELCOME TO FOODMUNCH</p>
+        <h2 id="authTitle">Login</h2>
+        <p id="authDescription">Login to your FoodMunch account.</p>
+
+        <!-- Login Form -->
+        <form id="loginForm">
+            <label class="form-field">
+                Email address
+                <input type="email" name="email" required autocomplete="email" placeholder="you@example.com">
+            </label>
+
+            <label class="form-field">
+                Password
+                <input type="password" name="password" required autocomplete="current-password" placeholder="Enter your password">
+            </label>
+
+            <p class="form-message" id="loginMessage" role="status"></p>
+
+            <button type="submit" class="button button-primary button-full">
+                Login
+            </button>
+
+            <p class="auth-switch">
+                Don't have an account?
+                <button type="button" id="showSignupButton">Sign Up</button>
+            </p>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="signupForm" hidden>
+            <label class="form-field">
+                Full name
+                <input type="text" name="name" required minlength="2" autocomplete="name" placeholder="Your name">
+            </label>
+
+            <label class="form-field">
+                Email address
+                <input type="email" name="email" required autocomplete="email" placeholder="you@example.com">
+            </label>
+
+            <label class="form-field">
+                Password
+                <input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters">
+            </label>
+
+            <p class="form-message" id="signupMessage" role="status"></p>
+
+            <button type="submit" class="button button-primary button-full">
+                Create Account
+            </button>
+
+            <p class="auth-switch">
+                Already have an account?
+                <button type="button" id="showLoginButton">Login</button>
+            </p>
+        </form>
+
+    </section>
+</div>
+
+<!-- My Orders Popup -->
+<div class="auth-overlay" id="myOrdersOverlay" hidden>
+    <section class="auth-modal orders-modal">
+        <button
+            type="button"
+            class="auth-close"
+            id="closeMyOrdersButton"
+            aria-label="Close"
+        >
+            &times;
+        </button>
+
+        <h2>My Orders</h2>
+
+        <p id="myOrdersMessage"></p>
+
+        <div id="myOrdersList"></div>
+    </section>
+</div>
+
+<!-- Admin Dashboard Popup -->
+<div class="auth-overlay" id="adminDashboardOverlay" hidden>
+    <section class="auth-modal orders-modal">
+
+        <button
+            type="button"
+            class="auth-close"
+            id="closeAdminDashboardButton"
+            aria-label="Close"
+        >
+            &times;
+        </button>
+
+        <h2>Admin Dashboard</h2>
+
+        <p id="adminDashboardMessage"></p>
+
+        <div id="adminOrdersList"></div>
+
+    </section>
+</div>
+
+<!-- Order Confirmation Page -->
+<div id="orderConfirmation" class="confirmation-overlay" hidden>
+    <div class="confirmation-card">
+        <div class="confirmation-check">✓</div>
+
+        <h1>Order Placed Successfully!</h1>
+        <p class="confirmation-subtitle">
+            Thank you for ordering with FoodMunch.
+        </p>
+
+        <div class="confirmation-order-id">
+            Order ID: <strong id="confirmationOrderId"></strong>
+        </div>
+
+        <div class="confirmation-status">
+            <span>Order Status</span>
+            <strong>Confirmed</strong>
+        </div>
+
+        <h2>Your Order Summary</h2>
+        <div id="confirmationItems"></div>
+
+        <div class="confirmation-total">
+            <span>Total Amount</span>
+            <strong id="confirmationTotal"></strong>
+        </div>
+
+        <div class="confirmation-address">
+            <h3>Delivery Details</h3>
+            <p id="confirmationCustomer"></p>
+            <p id="confirmationAddress"></p>
+        </div>
+
+        <button id="continueShoppingButton" type="button">
+            Continue Shopping
+        </button>
+    </div>
+</div>
+<style>
+    body:not(.authenticated) > *:not(#authOverlay) {
+        display: none !important;
+    }
+</style>
+</body>
+</html>
