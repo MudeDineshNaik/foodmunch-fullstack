@@ -5,6 +5,7 @@ const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const bcrypt = require("bcrypt");
 const session = require("express-session");
+const { triggerAsyncId } = require("async_hooks");
 
 const app = express();
 
@@ -182,17 +183,133 @@ const hasOrderRestaurantId = orderColumns.some(
 );
 
 if (!hasOrderRestaurantId) {
+    await db.exec(
+        "ALTER TABLE orders ADD COLUMN restaurant_id INTEGER REFERENCES restaurants(id)"
+    );
+}
 
-    const existingFoods = await db.get("SELECT COUNT(*) AS count FROM foods");
-    if (existingFoods.count === 0) {
-        for (const food of startingFoods) {
-            await db.run(
-                "INSERT INTO foods (name, category, price, image, description) VALUES (?, ?, ?, ?, ?)",
-                [food.name, food.category, food.price, food.image, food.description]
-            );
-        }
+// Insert starting foods if the table is empty
+const existingFoods = await db.get(
+    "SELECT COUNT(*) AS count FROM foods"
+);
+
+if (existingFoods.count === 0) {
+    for (const food of startingFoods) {
+        await db.run(
+            "INSERT INTO foods (name, category, price, image, description) VALUES (?, ?, ?, ?, ?)",
+            [food.name, food.category, food.price, food.image, food.description]
+        );
     }
 }
+
+} // End of initializeDatabase()
+
+
+app.post("/api/orders", async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({
+            message: "Please log in before placing your order."
+        });
+    }
+
+    try {
+        const { customerName, email, phone, address, items } = req.body;
+
+        if (!customerName || !email || !phone || !address ||
+            !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                message: "Please complete all fields and add at least one item."
+            });
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({
+                message: "Please enter a valid email address."
+            });
+        }
+
+        let total = 0;
+        let restaurantId = null;
+        const verifiedItems = [];
+
+        for (const item of items) {
+            const foodId = Number(item.id);
+            const quantity = Number(item.quantity);
+
+            if (!Number.isInteger(foodId) ||
+                !Number.isInteger(quantity) ||
+                quantity < 1 || quantity > 20) {
+                return res.status(400).json({
+                    message: "One of the order quantities is invalid."
+                });
+            }
+
+            const food = await db.get(
+                "SELECT id, name, price, restaurant_id FROM foods WHERE id = ?",
+                [foodId]
+            );
+
+            if (!food) {
+                return res.status(400).json({
+                    message: "A selected food item no longer exists."
+                });
+            }
+
+            if (!food.restaurant_id) {
+                return res.status(400).json({
+                    message: "This food item is not assigned to a restaurant yet."
+                });
+            }
+
+            if (restaurantId === null) {
+                restaurantId = food.restaurant_id;
+            } else if (restaurantId !== food.restaurant_id) {
+                return res.status(400).json({
+                    message: "Please order food from only one restaurant at a time."
+                });
+            }
+
+            total += food.price * quantity;
+
+            verifiedItems.push({
+                id: food.id,
+                name: food.name,
+                price: food.price,
+                quantity
+            });
+        }
+
+        const result = await db.run(
+            `INSERT INTO orders
+             (user_id, restaurant_id, customer_name, email, phone, address, items_json, total, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                req.session.user.id,
+                restaurantId,
+                customerName.trim(),
+                email.trim(),
+                phone.trim(),
+                address.trim(),
+                JSON.stringify(verifiedItems),
+                total,
+                "PLACED"
+            ]
+        );
+
+        res.status(201).json({
+            message: "Your demo order was placed successfully!",
+            orderId: result.lastID,
+            total
+        });
+
+    } catch (error) {
+        console.error("Could not place order:", error);
+
+        res.status(500).json({
+            message: "Something went wrong while placing the order."
+        });
+    }
+});
 
 app.get("/api/health", (req, res) => {
     res.json({ status: "ok", message: "FoodMunch API is running" });
@@ -356,74 +473,7 @@ app.get("/api/foods", async (req, res) => {
     }
 });
 
-app.post("/api/orders", async (req, res) => {
-        if (!req.session.user) {
-        return res.status(401).json({
-            message: "Please log in before placing your order."
-        });
-    }
-    try {
-        const { customerName, email, phone, address, items } = req.body;
 
-        if (!customerName || !email || !phone || !address || !Array.isArray(items) || items.length === 0) {
-            return res.status(400).json({ message: "Please complete all fields and add at least one item." });
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            return res.status(400).json({ message: "Please enter a valid email address." });
-        }
-
-        // Recalculate prices on the server. Never trust prices sent by the browser.
-        let total = 0;
-        const verifiedItems = [];
-
-        for (const item of items) {
-            const foodId = Number(item.id);
-            const quantity = Number(item.quantity);
-
-            if (!Number.isInteger(foodId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
-                return res.status(400).json({ message: "One of the order quantities is invalid." });
-            }
-
-            const food = await db.get("SELECT id, name, price FROM foods WHERE id = ?", [foodId]);
-            if (!food) {
-                return res.status(400).json({ message: "A selected food item no longer exists." });
-            }
-
-            total += food.price * quantity;
-            verifiedItems.push({ id: food.id, name: food.name, price: food.price, quantity });
-        }
-
-        
-
-const result = await db.run(
-    `INSERT INTO orders
-        (user_id, customer_name, email, phone, address, items_json, total, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-        req.session.user.id,
-        customerName.trim(),
-        email.trim(),
-        phone.trim(),
-        address.trim(),
-        JSON.stringify(verifiedItems),
-        total,
-        "PLACED"
-    ]
-);
-
-
-
-        res.status(201).json({
-            message: "Your demo order was placed successfully!",
-            orderId: result.lastID,
-            total
-        });
-    } catch (error) {
-        console.error("Could not place order:", error);
-        res.status(500).json({ message: "Something went wrong while placing the order." });
-    }
-});
 
 
 /* GET ORDERS FOR THE LOGGED-IN USER */
@@ -576,6 +626,263 @@ app.get("/api/owner/restaurants", requireRestaurantOwner, async (req, res) => {
         });
     }
 });
+
+// Get food items belonging to the logged-in restaurant owner
+app.get("/api/owner/foods", requireRestaurantOwner, async (req, res) => {
+    try {
+        const foods = await db.all(
+            `SELECT foods.*
+             FROM foods
+             JOIN restaurants
+             ON foods.restaurant_id = restaurants.id
+             WHERE restaurants.owner_id = ?
+             ORDER BY foods.id DESC`,
+            [req.session.user.id]
+        );
+
+        res.json({ foods });
+
+    } catch (error) {
+        console.error("Owner foods error:", error);
+
+        res.status(500).json({
+            message: "Could not load restaurant food items."
+        });
+    }
+});
+
+// Add a food item to the owner's restaurant
+app.post("/api/owner/foods", requireRestaurantOwner, async (req, res) => {
+    try {
+        const {
+            restaurantId,
+            name,
+            category,
+            price,
+            image,
+            description
+        } = req.body;
+
+        if (!restaurantId || !name || !category || !price) {
+            return res.status(400).json({
+                message: "Restaurant, name, category and price are required."
+            });
+        }
+
+        // Check whether this restaurant belongs to the logged-in owner
+        const restaurant = await db.get(
+            `SELECT id FROM restaurants
+             WHERE id = ? AND owner_id = ?`,
+            [restaurantId, req.session.user.id]
+        );
+
+        if (!restaurant) {
+            return res.status(403).json({
+                message: "You cannot add food to this restaurant."
+            });
+        }
+
+        const result = await db.run(
+            `INSERT INTO foods
+             (name, category, price, image, description, restaurant_id)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+                name.trim(),
+                category.trim(),
+                Number(price),
+                image || "",
+                description || "",
+                restaurant.id
+            ]
+        );
+
+        res.status(201).json({
+            message: "Food item added successfully.",
+            foodId: result.lastID
+        });
+
+    } catch (error) {
+        console.error("Add food error:", error);
+
+        res.status(500).json({
+            message: "Could not add food item."
+        });
+    }
+});
+
+// Update a food item belonging to the owner
+app.put("/api/owner/foods/:id", requireRestaurantOwner, async (req, res) => {
+    try {
+        const { name, category, price, image, description } = req.body;
+        const foodId = req.params.id;
+
+        // Check whether this food belongs to the logged-in owner
+        const food = await db.get(
+            `SELECT foods.id
+             FROM foods
+             JOIN restaurants
+             ON foods.restaurant_id = restaurants.id
+             WHERE foods.id = ? AND restaurants.owner_id = ?`,
+            [foodId, req.session.user.id]
+        );
+
+        if (!food) {
+            return res.status(404).json({
+                message: "Food item not found."
+            });
+        }
+
+        if (!name || !category || !Number.isFinite(Number(price)) || Number(price) <= 0) {
+            return res.status(400).json({
+                message: "Enter a valid name, category and price."
+            });
+        }
+
+        await db.run(
+            `UPDATE foods
+             SET name = ?, category = ?, price = ?, image = ?, description = ?
+             WHERE id = ?`,
+            [
+                name.trim(),
+                category.trim(),
+                Number(price),
+                image || "",
+                description || "",
+                foodId
+            ]
+        );
+
+        res.json({
+            message: "Food item updated successfully."
+        });
+
+    } catch (error) {
+        console.error("Update food error:", error);
+
+        res.status(500).json({
+            message: "Could not update food item."
+        });
+    }
+});
+
+// Delete a food item belonging to the owner
+app.delete("/api/owner/foods/:id", requireRestaurantOwner, async (req, res) => {
+    try {
+        const foodId = req.params.id;
+
+        // Check whether this food belongs to the logged-in owner
+        const food = await db.get(
+            `SELECT foods.id
+             FROM foods
+             JOIN restaurants
+             ON foods.restaurant_id = restaurants.id
+             WHERE foods.id = ? AND restaurants.owner_id = ?`,
+            [foodId, req.session.user.id]
+        );
+
+        if (!food) {
+            return res.status(404).json({
+                message: "Food item not found."
+            });
+        }
+
+        await db.run(
+            "DELETE FROM foods WHERE id = ?",
+            [foodId]
+        );
+
+        res.json({
+            message: "Food item deleted successfully."
+        });
+
+    } catch (error) {
+        console.error("Delete food error:", error);
+
+        res.status(500).json({
+            message: "Could not delete food item."
+        });
+    }
+});
+// Get orders belonging to the owner's restaurants
+app.get("/api/owner/orders", requireRestaurantOwner, async (req, res) => {
+    try {
+        const orders = await db.all(
+            `SELECT orders.*, users.name AS customer_user_name
+             FROM orders
+             JOIN restaurants
+             ON orders.restaurant_id = restaurants.id
+             JOIN users
+             ON orders.user_id = users.id
+             WHERE restaurants.owner_id = ?
+             ORDER BY orders.id DESC`,
+            [req.session.user.id]
+        );
+
+        res.json({ orders });
+
+    } catch (error) {
+        console.error("Owner orders error:", error);
+
+        res.status(500).json({
+            message: "Could not load restaurant orders."
+        });
+    }
+});
+
+
+// Update order status by restaurant owner
+app.put("/api/owner/orders/:id/status", requireRestaurantOwner, async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const { status } = req.body;
+
+        const allowedStatuses = [
+            "PREPARING",
+            "OUT_FOR_DELIVERY",
+            "DELIVERED",
+            "CANCELLED"
+        ];
+
+        if (!allowedStatuses.includes(status)) {
+            return res.status(400).json({
+                message: "Invalid order status."
+            });
+        }
+
+        // Check whether this order belongs to the owner's restaurant
+        const order = await db.get(
+            `SELECT orders.id
+             FROM orders
+             JOIN restaurants
+             ON orders.restaurant_id = restaurants.id
+             WHERE orders.id = ? AND restaurants.owner_id = ?`,
+            [orderId, req.session.user.id]
+        );
+
+        if (!order) {
+            return res.status(404).json({
+                message: "Order not found."
+            });
+        }
+
+        await db.run(
+            "UPDATE orders SET status = ? WHERE id = ?",
+            [status, orderId]
+        );
+
+        res.json({
+            message: "Order status updated successfully."
+        });
+
+    } catch (error) {
+        console.error("Order status update error:", error);
+
+        res.status(500).json({
+            message: "Could not update order status."
+        });
+    }
+});
+
 /* CANCEL AN ORDER */
 
 app.put("/api/orders/:orderId/cancel", async (req, res) => {

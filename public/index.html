@@ -40,6 +40,10 @@
     Admin Dashboard
 </button>
 
+<button type="button" class="auth-nav-button" id="ownerDashboardButton" hidden>
+    Restaurant Owner Dashboard
+</button>
+
     <button type="button" class="auth-nav-button" id="logoutButton" hidden>
         Logout
     </button>
@@ -302,10 +306,25 @@
         </button>
     </div>
 </div>
-<style>
-    body:not(.authenticated) > *:not(#authOverlay) {
-        display: none !important;
-    }
-</style>
+
+<!-- Restaurant Owner Dashboard -->
+<div id="ownerDashboardOverlay" class="dashboard-overlay" hidden>
+    <div class="dashboard-container">
+
+        <h2>Restaurant Owner Dashboard</h2>
+
+        <p id="ownerDashboardMessage">
+            Loading restaurant orders...
+        </p>
+
+        <div id="ownerOrdersList"></div>
+
+        <button type="button" id="closeOwnerDashboard">
+            Close Dashboard
+        </button>
+
+    </div>
+</div>
+
 </body>
 </html>

@@ -348,33 +348,44 @@ checkoutForm.addEventListener("submit", async (event) => {
     placeOrderButton.textContent = "Placing order...";
     formMessage.textContent = "";
 
+  try {
+    const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(order)
+    });
+
+    const responseText = await response.text();
+
+    let result;
+
     try {
-        const response = await fetch("/api/orders", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(order)
-        });
-
-        const result = await response.json();
-        if (!response.ok) {
-            throw new Error(result.message || "Could not place the order.");
-        }
-
-                    cart = [];
-            renderCart();
-            checkoutForm.reset();
-
-            closeCheckout();
-
-            showOrderConfirmation(
-                result.orderId,
-                result.total,
-                order,
-                orderedItems
-            );
-
-            showToast("Your demo order was placed!");
+        result = JSON.parse(responseText);
     } catch (error) {
+        console.error("Server returned non-JSON response:", responseText);
+        throw new Error("Server returned an unexpected response. Check the backend terminal.");
+    }
+
+    if (!response.ok) {
+        throw new Error(result.message || "Could not place the order.");
+    }
+
+    cart = [];
+    renderCart();
+    checkoutForm.reset();
+
+    closeCheckout();
+
+    showOrderConfirmation(
+        result.orderId,
+        result.total,
+        order,
+        orderedItems
+    );
+
+    showToast("Your demo order was placed!");
+
+} catch (error) {
         formMessage.classList.remove("success");
         formMessage.textContent = error.message || "Something went wrong. Please try again.";
     } finally {
@@ -391,6 +402,11 @@ const loginButton = document.getElementById("loginButton");
 
 const myOrdersButton = document.getElementById("myOrdersButton");
 const adminDashboardButton = document.getElementById("adminDashboardButton");
+const ownerDashboardButton = document.getElementById("ownerDashboardButton");
+const ownerDashboardOverlay = document.getElementById("ownerDashboardOverlay");
+const ownerDashboardMessage = document.getElementById("ownerDashboardMessage");
+const ownerOrdersList = document.getElementById("ownerOrdersList");
+const closeOwnerDashboard = document.getElementById("closeOwnerDashboard");
 const adminDashboardOverlay = document.getElementById("adminDashboardOverlay");
 const closeAdminDashboardButton = document.getElementById("closeAdminDashboardButton");
 const adminDashboardMessage = document.getElementById("adminDashboardMessage");
@@ -417,13 +433,13 @@ function updateAuthUI(user) {
     const logoutButton = document.getElementById("logoutButton");
     const myOrdersButton = document.getElementById("myOrdersButton");
 
+    // Always allow visitors to browse the website
+    document.body.classList.add("authenticated");
+
+    // Never open the login popup automatically
+    authOverlay.hidden = true;
+
     if (user) {
-        // Show website after successful login
-        document.body.classList.add("authenticated");
-
-        // Close login popup
-        authOverlay.hidden = true;
-
         loginButton.hidden = true;
         signupButton.hidden = true;
 
@@ -434,14 +450,8 @@ function updateAuthUI(user) {
         myOrdersButton.hidden = false;
 
     } else {
-        // Hide website when logged out
-        document.body.classList.remove("authenticated");
-
-        // Show login popup
-        authOverlay.hidden = false;
-
-        loginButton.hidden = true;
-        signupButton.hidden = true;
+        loginButton.hidden = false;
+        signupButton.hidden = false;
 
         userGreeting.hidden = true;
         userGreeting.textContent = "";
@@ -450,8 +460,11 @@ function updateAuthUI(user) {
         myOrdersButton.hidden = true;
     }
 
-    // Show Admin Dashboard only for admin users
+    // Show Admin Dashboard only to admins
     adminDashboardButton.hidden = !user || user.role !== "ADMIN";
+
+    // Show Restaurant Owner Dashboard only to restaurant owners
+    ownerDashboardButton.hidden = !user || user.role !== "RESTAURANT_OWNER";
 }
 
 
@@ -827,6 +840,143 @@ result.orders.forEach((order) => {
     } catch (error) {
         adminDashboardMessage.textContent = error.message;
     }
+});
+
+
+ownerDashboardButton.addEventListener("click", async () => {
+    ownerDashboardOverlay.hidden = false;
+    document.body.classList.add("no-scroll");
+
+    ownerDashboardMessage.textContent = "Loading restaurant orders...";
+    ownerOrdersList.innerHTML = "";
+
+    try {
+        const response = await fetch("/api/owner/orders");
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "Could not load restaurant orders.");
+        }
+
+        if (result.orders.length === 0) {
+            ownerDashboardMessage.textContent = "No orders found.";
+            return;
+        }
+
+        ownerDashboardMessage.textContent =
+            "Total Orders: " + result.orders.length;
+
+        result.orders.forEach((order) => {
+
+            const orderCard = document.createElement("div");
+            orderCard.className = "order-card";
+
+            // Order ID
+            const orderTitle = document.createElement("h3");
+            orderTitle.textContent = "Order #" + order.id;
+            orderCard.appendChild(orderTitle);
+
+            // Customer name
+            const customerName = document.createElement("p");
+            customerName.textContent = "Customer: " + order.customer_name;
+            orderCard.appendChild(customerName);
+
+            // Order items
+            const orderItems = document.createElement("p");
+            orderItems.textContent = "Items: " + JSON.parse(order.items_json)
+                .map((item) => item.name + " x " + item.quantity)
+                .join(", ");
+            orderCard.appendChild(orderItems);
+
+            // Total amount
+            const orderTotal = document.createElement("p");
+            orderTotal.textContent = "Total: ₹" + order.total;
+            orderCard.appendChild(orderTotal);
+
+            // Current order status
+            const orderStatus = document.createElement("p");
+            orderStatus.textContent = "Status: " + order.status;
+            orderCard.appendChild(orderStatus);
+
+            // Status dropdown
+            const statusSelect = document.createElement("select");
+
+            const statuses = [
+                "PLACED",
+                "PREPARING",
+                "OUT_FOR_DELIVERY",
+                "DELIVERED",
+                "CANCELLED"
+            ];
+
+            statuses.forEach((status) => {
+                const option = document.createElement("option");
+                option.value = status;
+                option.textContent = status;
+                statusSelect.appendChild(option);
+            });
+
+            statusSelect.value = order.status;
+            orderCard.appendChild(statusSelect);
+
+            // Update button
+            const updateStatusButton = document.createElement("button");
+            updateStatusButton.textContent = "Update Status";
+            orderCard.appendChild(updateStatusButton);
+
+            // Save updated status
+            updateStatusButton.addEventListener("click", async () => {
+
+                updateStatusButton.disabled = true;
+                updateStatusButton.textContent = "Updating...";
+
+                try {
+                    const response = await fetch(
+                        `/api/owner/orders/${order.id}/status`,
+                        {
+                            method: "PUT",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                status: statusSelect.value
+                            })
+                        }
+                    );
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            result.message || "Could not update status."
+                        );
+                    }
+
+                    orderStatus.textContent = "Status: " + statusSelect.value;
+
+                    alert("Order status updated successfully!");
+
+                } catch (error) {
+                    alert(error.message);
+
+                } finally {
+                    updateStatusButton.disabled = false;
+                    updateStatusButton.textContent = "Update Status";
+                }
+            });
+
+            ownerOrdersList.appendChild(orderCard);
+        });
+
+    } catch (error) {
+        ownerDashboardMessage.textContent = error.message;
+    }
+});
+
+
+closeOwnerDashboard.addEventListener("click", () => {
+    ownerDashboardOverlay.hidden = true;
+    document.body.classList.remove("no-scroll");
 });
 
 closeAdminDashboardButton.addEventListener("click", () => {
